@@ -134,7 +134,7 @@ for i in (1, 3):
     if (box[i][1] > maxy): maxy = box[i][1]
 
 # display the percentage above the bounding box
-cv2.putText(img,"{:4.1f}%".format(pct * 100),(minx+150,miny-30),cv2.FONT_HERSHEY_SIMPLEX,3.0,(0,255,255),4)
+cv2.putText(img,"{:4.1f}%".format(pct * 100),(minx+150,miny-0),cv2.FONT_HERSHEY_SIMPLEX,3.0,(0,255,255),4)
 
 # scale the extents for some background in the cropping
 cropscale = 1.5
