@@ -1,5 +1,3 @@
-__author__ = 'Chris'
-import picamera
 import math
 import datetime
 import cv2
@@ -8,50 +6,42 @@ import numpy as np
 import httplib
 import time
 
-stream = io.BytesIO()
+camera_port = 1
+ramp_frames = 30
+camera = cv2.VideoCapture(camera_port)
+ 
+#Takes Picture
+def get_image():
+ retval, im = camera.read()
+ return im
+ 
+for i in xrange(ramp_frames):
+ temp = get_image()
+print("Taking image...")
+image = get_image()
+file = "test_image.jpg"
+cv2.imwrite(file, image)
+del(camera)
 
-CAMERA_WIDTH = 2592
-CAMERA_HEIGHT = 1944
+#Rotate
+#image = cv2.transpose(image)
+#image = cv2.flip(image, 0)
 
-# Take a picture using picamera
-with picamera.PiCamera() as camera:
-    camera.resolution = (CAMERA_WIDTH, CAMERA_HEIGHT)
-    camera.awb_mode = 'shade'
-    camera.start_preview()
-    time.sleep(5)
-    camera.capture(stream, format='jpeg')
-
-data = np.fromstring(stream.getvalue(), dtype=np.uint8)
-
-#import the picture into openCV
-image = cv2.imdecode(data, 1)
-
-# write original image if needed for off-line processing
-#cv2.imwrite("oilorig.jpg",image)
-
-# uncomment for off-line processing to use saved image
-#image = cv2.imread("oilorig.jpg")
-
-# due to physical mounting requirements of camera, rotate image for meter readable orientation
-image = cv2.transpose(image)
-image = cv2.flip(image, 0)
-
-# making a copy of the image for processing, process in grayscale
+# Grayscale
 img = image
 imggray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-
 imggray = cv2.blur(imggray,(5,5))
 ret,imgbinary = cv2.threshold(imggray, 50, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 ret,imgbinary = cv2.threshold(imggray, ret + 30, 255, cv2.THRESH_BINARY)
 
+
 # write out or show processed image for debugging
-#cv2.imwrite("bin.jpg",imgbinary)
-#cv2.imshow("thresh", imgbinary)
+cv2.imwrite("bin.jpg",imgbinary)
 
 #find largest blob, the white background of the meter
 # switch for pc/pi, depending if running on pi library or PC return value may require 2 or 3 vars
-# imgcont, contours,hierarchy = cv2.findContours(imgbinary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-contours,hierarchy = cv2.findContours(imgbinary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+imgcont, contours,hierarchy = cv2.findContours(imgbinary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+# contours,hierarchy = cv2.findContours(imgbinary, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 maxarea = 0
 index = 0
 meterContour = 0
@@ -122,7 +112,7 @@ print pct
 
 # for display / archive purposes crop the image to the meter view using bounding box
 minRect = cv2.minAreaRect(contours[meterContour])
-box = cv2.cv.BoxPoints(minRect)
+box = cv2.boxPoints(minRect)
 box = np.int0(box)
 
 # draw the graphics of the box and needle
