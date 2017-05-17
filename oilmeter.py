@@ -5,6 +5,29 @@ import io
 import numpy as np
 import httplib
 import time
+import gspread
+import oauth2client
+import httplib2
+import os
+import base64
+import email.mime
+import mimetypes
+from oauth2client.service_account import ServiceAccountCredentials
+from apiclient import discovery, errors
+from oauth2client import client
+from oauth2client import tools
+from email.mime.text import MIMEText
+from oauth2client.file import Storage
+from email.MIMEMultipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+
+scope = 'https://spreadsheets.google.com/feeds https://www.googleapis.com/auth/gmail.compose'
+creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+client_sheets = gspread.authorize(creds)
+CLIENT_SECRET_FILE = 'gmail_secret.json'
+APPLICATION_NAME = 'oil_email'
+
 
 camera_port = 1
 ramp_frames = 30
@@ -33,10 +56,6 @@ imggray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 imggray = cv2.blur(imggray,(5,5))
 ret,imgbinary = cv2.threshold(imggray, 50, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 ret,imgbinary = cv2.threshold(imggray, ret + 30, 255, cv2.THRESH_BINARY)
-
-
-# write out or show processed image for debugging
-cv2.imwrite("bin.jpg",imgbinary)
 
 #find largest blob, the white background of the meter
 # switch for pc/pi, depending if running on pi library or PC return value may require 2 or 3 vars
@@ -97,7 +116,6 @@ if (line_vx * dx + line_vy * dy < 0):
 
 # with the corrected line vector, compute the angle and convert to degrees
 line_angle = math.atan2(line_vy, line_vx) * 180 / math.pi
-print line_angle
 
 # normalize the angle of the meter
 # the needle will go from approx 135 on the low end to 35 degrees on the high end
@@ -169,19 +187,120 @@ with open('angle.log','a') as outf:
     outf.write(timestr())
     outf.write('{:5.1f} deg {:4.1%}\n'.format(line_angle, pct))
 
-# the following code will post the percentage to an openHAB server
-# in openHAB the item oilLevel is defined as a Number
-msg = '{:4.1f}'.format(pct * 100)
+percentageLeft = '{:4.1f}'.format(pct * 100)
 
-web = httplib.HTTP('192.168.2.20:8080')
-web.putrequest('POST', '/rest/items/oilLevel')
-web.putheader('Content-type', 'text/plain')
-web.putheader('Content-length', '%d' % len(msg))
-web.endheaders()
-web.send(msg)
-statuscode, statusmessage, header = web.getreply()
-result = web.getfile().read()
+# #Google Drive
+row = [timestr(), pct]
+sheet = client_sheets.open('OilTankData').sheet1
+# sheet.insert_row(row)
+result = sheet.row_values(1)
+sheetsPerc = result[1]
+print sheetsPerc
 
-# uncomment if debugging with opencv window views
-#cv2.waitKey()
-#cv2.destroyAllWindows()
+# for x in range(1,7)
+#     if(sheetsPerc < .75):
+#         print '75'
+
+
+# elif(sheetsPerc > .50):
+#     print '50'
+# elif(sheetsPerc > .25):
+#     print '25'
+# elif(sheetsPerc > .10):
+#     print '10'
+# elif(sheetsPerc > .05):
+#     print '5'
+# elif(sheetsPerc > .01):
+#     print '1'
+
+try:
+    import argparse
+    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
+except ImportError:
+    flags = None
+
+def SendMessage(service, user_id, message): # Send an email message.
+    try:
+      message = (service.users().messages().send(userId=user_id, body=message)
+               .execute())
+      print ('Message Id: %s' % message['id'])
+      return message
+    except errors.HttpError as error:
+      print ('An error occurred: %s' % error)
+
+def get_credentials(): # Gets valid user credentials from disk.
+    credential_dir = 'C:\Users\\antth\Documents\GitHub\OilLevelReader'
+    if not os.path.exists(credential_dir):
+        os.makedirs(credential_dir)
+    credential_path = os.path.join(credential_dir,
+                                   'gmail_python.json')
+
+    store = oauth2client.file.Storage(credential_path)
+    credentials = store.get()
+    if not credentials or credentials.invalid:
+        flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, scope)
+        flow.user_agent = APPLICATION_NAME
+        if flags:
+            credentials = tools.run_flow(flow, store, flags)
+        else: # Needed only for compatibility with Python 2.6
+            credentials = tools.run(flow, store)
+        print('Storing credentials to ' + credential_path)
+    return credentials
+
+def create_message(sender, to, subject, message_text): # Create a message for an email.
+    message = MIMEText(message_text)
+    message['to'] = to
+    message['from'] = sender
+    message['subject'] = subject
+    return {'raw': base64.urlsafe_b64encode(message.as_string())}
+
+def mail(sender, recepient, subject, text_body ):
+    credentials = get_credentials()
+    http = credentials.authorize(httplib2.Http())
+    service = discovery.build('gmail', 'v1', http=http)
+    testMessage = create_message_with_attachment(sender, recepient, subject, text_body, 'oil.jpg' )
+    SendMessage(service, sender, testMessage )
+
+def create_message_with_attachment(sender, to, subject, message_text, file):
+  message = MIMEMultipart()
+  message['to'] = to
+  message['from'] = sender
+  message['subject'] = subject
+
+  msg = MIMEText(message_text)
+  message.attach(msg)
+
+  content_type, encoding = mimetypes.guess_type(file)
+
+  if content_type is None or encoding is not None:
+    content_type = 'application/octet-stream'
+  main_type, sub_type = content_type.split('/', 1)
+  if main_type == 'text':
+    fp = open(file, 'rb')
+    msg = MIMEText(fp.read(), _subtype=sub_type)
+    fp.close()
+  elif main_type == 'image':
+    fp = open(file, 'rb')
+    msg = MIMEImage(fp.read(), _subtype=sub_type)
+    fp.close()
+  elif main_type == 'audio':
+    fp = open(file, 'rb')
+    msg = MIMEAudio(fp.read(), _subtype=sub_type)
+    fp.close()
+  else:
+    fp = open(file, 'rb')
+    msg = MIMEBase(main_type, sub_type)
+    msg.set_payload(fp.read())
+    fp.close()
+  filename = os.path.basename(file)
+  msg.add_header('Content-Disposition', 'attachment', filename=filename)
+  message.attach(msg)
+  return {'raw': base64.urlsafe_b64encode(message.as_string())}
+
+
+recepient_email = ''
+sender_email = ''
+subject_box = 'Oil Tank Level'
+body_box = 'The oil tank has ' + percentageLeft + "% of its oil remaining."
+
+mail(sender_email, recepient_email, subject_box, body_box)
