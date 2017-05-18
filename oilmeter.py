@@ -189,30 +189,15 @@ with open('angle.log','a') as outf:
 
 percentageLeft = '{:4.1f}'.format(pct * 100)
 
-# #Google Drive
+#Google Drive Data Log (Sheet 2)
 row = [timestr(), pct]
-sheet = client_sheets.open('OilTankData').sheet1
-# sheet.insert_row(row)
-result = sheet.row_values(1)
+sheet2 = client_sheets.open('OilTankData').get_worksheet(1)
+sheet2.insert_row(row)
+result = sheet2.row_values(1)
 sheetsPerc = result[1]
-print sheetsPerc
+sheetsPerc = float(sheetsPerc)
 
-# for x in range(1,7)
-#     if(sheetsPerc < .75):
-#         print '75'
-
-
-# elif(sheetsPerc > .50):
-#     print '50'
-# elif(sheetsPerc > .25):
-#     print '25'
-# elif(sheetsPerc > .10):
-#     print '10'
-# elif(sheetsPerc > .05):
-#     print '5'
-# elif(sheetsPerc > .01):
-#     print '1'
-
+#Gmail API
 try:
     import argparse
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
@@ -297,10 +282,58 @@ def create_message_with_attachment(sender, to, subject, message_text, file):
   message.attach(msg)
   return {'raw': base64.urlsafe_b64encode(message.as_string())}
 
+#Google Drive Data Log (Sheet 3)
+sheet3 = client_sheets.open('OilTankData').get_worksheet(2)
+result = sheet3.col_values(2)
+full = float(result[0])
+threequart = float(result[1])
+half = float(result[2])
+onequart = float(result[3])
+ten = float(result[4])
+five = float(result[5])
+one = float(result[6])
 
+#Email
 recepient_email = ''
 sender_email = ''
 subject_box = 'Oil Tank Level'
 body_box = 'The oil tank has ' + percentageLeft + "% of its oil remaining."
 
-mail(sender_email, recepient_email, subject_box, body_box)
+#Check if tank has been filled since last script run
+num = sheet2.col_values(2)
+first = float(num[0])
+second = float(num[1])
+
+if(second + .1) < first: 
+    for x in range (1, 7):
+        sheet3.update_cell(x,2, 0)  
+               
+#send email
+if sheetsPerc < .01 and one == 0:
+    #mail(sender_email, recepient_email, subject_box, body_box)
+    sheet3.update_cell(7,2, 1)
+    one = 1
+elif sheetsPerc > .01 and sheetsPerc <= .05 and five == 0:
+    #mail(sender_email, recepient_email, subject_box, body_box)
+    sheet3.update_cell(6,2, 1)
+    five = 1
+elif sheetsPerc > .05 and sheetsPerc <= .10 and ten == 0:
+    #mail(sender_email, recepient_email, subject_box, body_box)
+    sheet3.update_cell(5,2, 1)
+    ten = 1
+elif sheetsPerc > .10 and sheetsPerc <= .25 and onequart == 0:
+    #mail(sender_email, recepient_email, subject_box, body_box)
+    sheet3.update_cell(4,2, 1)
+    onequart = 1
+elif sheetsPerc > .25 and sheetsPerc <= .50 and half == 0:
+    #mail(sender_email, recepient_email, subject_box, body_box)
+    sheet3.update_cell(3,2, 1)
+    half = 1
+elif sheetsPerc > .50 and sheetsPerc <= .75 and threequart == 0:
+    #mail(sender_email, recepient_email, subject_box, body_box)
+    sheet3.update_cell(2,2, 1)
+    threequart = 1
+elif sheetsPerc > .75 and sheetsPerc <= 1 and full == 0:
+    #mail(sender_email, recepient_email, subject_box, body_box)
+    sheet3.update_cell(1,2, 1)
+    full = 1
