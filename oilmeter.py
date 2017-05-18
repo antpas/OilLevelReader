@@ -21,13 +21,13 @@ from oauth2client.file import Storage
 from email.MIMEMultipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
+from array import *
 
 scope = 'https://spreadsheets.google.com/feeds https://www.googleapis.com/auth/gmail.compose'
 creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
 client_sheets = gspread.authorize(creds)
 CLIENT_SECRET_FILE = 'gmail_secret.json'
 APPLICATION_NAME = 'oil_email'
-
 
 camera_port = 1
 ramp_frames = 30
@@ -294,7 +294,6 @@ five = float(result[5])
 one = float(result[6])
 
 #Email
-recepient_email = ''
 sender_email = ''
 subject_box = 'Oil Tank Level'
 body_box = 'The oil tank has ' + percentageLeft + "% of its oil remaining."
@@ -306,34 +305,45 @@ second = float(num[1])
 
 if(second + .1) < first: 
     for x in range (1, 7):
-        sheet3.update_cell(x,2, 0)  
+        sheet3.update_cell(x,2, 0) 
+
+rec_emails = []
+tempTo = sheet3.col_values(4)
+for x in range (0, 9):
+    if tempTo[x + 1] == "":
+        break
+    rec_emails.append(str(tempTo[x + 1]))
                
-#send email
+# send email
+def send_mail_all():
+    for x in range(0, len(rec_emails)):
+        #mail(sender_email, rec_emails[x], subject_box, body_box)
+
 if sheetsPerc < .01 and one == 0:
-    #mail(sender_email, recepient_email, subject_box, body_box)
+    send_mail_all()
     sheet3.update_cell(7,2, 1)
     one = 1
 elif sheetsPerc > .01 and sheetsPerc <= .05 and five == 0:
-    #mail(sender_email, recepient_email, subject_box, body_box)
+    send_mail_all()
     sheet3.update_cell(6,2, 1)
     five = 1
 elif sheetsPerc > .05 and sheetsPerc <= .10 and ten == 0:
-    #mail(sender_email, recepient_email, subject_box, body_box)
+    send_mail_all()
     sheet3.update_cell(5,2, 1)
     ten = 1
 elif sheetsPerc > .10 and sheetsPerc <= .25 and onequart == 0:
-    #mail(sender_email, recepient_email, subject_box, body_box)
+    send_mail_all()
     sheet3.update_cell(4,2, 1)
     onequart = 1
 elif sheetsPerc > .25 and sheetsPerc <= .50 and half == 0:
-    #mail(sender_email, recepient_email, subject_box, body_box)
+    send_mail_all()
     sheet3.update_cell(3,2, 1)
     half = 1
 elif sheetsPerc > .50 and sheetsPerc <= .75 and threequart == 0:
-    #mail(sender_email, recepient_email, subject_box, body_box)
+    send_mail_all()
     sheet3.update_cell(2,2, 1)
     threequart = 1
 elif sheetsPerc > .75 and sheetsPerc <= 1 and full == 0:
-    #mail(sender_email, recepient_email, subject_box, body_box)
+    send_mail_all()
     sheet3.update_cell(1,2, 1)
     full = 1
